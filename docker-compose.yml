@@ -1,10 +1,49 @@
-version: "2.2"
 services:
   web:
     build: .
+    restart: unless-stopped
     ports:
-      - "80:80"
-      - "9000:9000"
+      - "8080:80"
     environment:
-      WEB_DOCUMENT_ROOT: "/app/public"
-    tty: true
+      WEB_DOCUMENT_ROOT: /app/public
+    volumes:
+      - app_data:/app
+    depends_on:
+      - db
+      - redis
+
+  worker:
+    build: .
+    profiles: ["worker"]
+    restart: unless-stopped
+    working_dir: /app
+    entrypoint: ["php"]
+    command: ["artisan", "queue:work", "redis", "--sleep=3", "--tries=3", "--timeout=60"]
+    volumes:
+      - app_data:/app
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: mariadb:10.5
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: dujiaoka
+      MYSQL_USER: dujiaoka
+      MYSQL_PASSWORD: ${DUJIAOKA_DB_PASSWORD:?Set DUJIAOKA_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DUJIAOKA_DB_ROOT_PASSWORD:?Set DUJIAOKA_DB_ROOT_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+
+  redis:
+    image: redis:6.2-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+
+volumes:
+  app_data:
+  db_data:
+  redis_data:
